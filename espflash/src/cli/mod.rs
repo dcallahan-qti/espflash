@@ -36,13 +36,7 @@ use crate::{
     connection::reset::{ResetAfterOperation, ResetBeforeOperation},
     error::{Error, MissingPartition, MissingPartitionTable},
     flasher::{
-        FLASH_SECTOR_SIZE,
-        FlashData,
-        FlashFrequency,
-        FlashMode,
-        FlashSettings,
-        FlashSize,
-        Flasher,
+        FLASH_SECTOR_SIZE, FlashData, FlashFrequency, FlashMode, FlashSettings, FlashSize, Flasher,
         ProgressCallbacks,
     },
     image_format::Metadata,
@@ -79,6 +73,9 @@ pub struct ConnectArgs {
     /// Do not use the RAM stub for loading
     #[arg(long)]
     pub no_stub: bool,
+    /// Serial port is a known fixed PCI port
+    #[arg(long)]
+    pub known_port: bool,
     /// Serial port connected to target device
     #[arg(short = 'p', long, env = "ESPFLASH_PORT")]
     pub port: Option<String>,
@@ -394,7 +391,25 @@ pub fn connect(
         );
     }
 
-    let port_info = serial::serial_port_info(args, config)?;
+    //let port_info = serial::serial_port_info(args, config)?;
+
+    let port_info = if args.known_port {
+        if let Some(port_name) = &args.port {
+            SerialPortInfo {
+                port_name: port_name.to_owned(),
+                port_type: SerialPortType::PciPort,
+            }
+        } else if let Some(port_name) = &config.port_config.connection.serial {
+            SerialPortInfo {
+                port_name: port_name.to_owned(),
+                port_type: SerialPortType::PciPort,
+            }
+        } else {
+            serial::serial_port_info(args, config)?
+        }
+    } else {
+        serial::serial_port_info(args, config)?
+    };
 
     // Attempt to open the serial port and set its initial baud rate.
     info!("Serial port: '{}'", port_info.port_name);
